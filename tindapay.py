@@ -5,7 +5,7 @@ import plotly.express as px
 import pandas as pd
 
 app = Dash(__name__, suppress_callback_exceptions=True)
-app = app.server
+server = app.server
 
 app.layout = html.Div([
     html.H1('Upload TindaPay Dashboard Data', style={'textAlign': 'center'}),

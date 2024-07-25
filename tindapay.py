@@ -1,12 +1,10 @@
 import base64
 import io
-
-from dash import Dash, dcc, html, dash_table, Input, Output, State, MATCH, no_update
+from dash import Dash, dcc, html, dash_table, Input, Output, State
 import plotly.express as px
 import pandas as pd
 
 app = Dash(__name__, suppress_callback_exceptions=True)
-server = app.server
 
 app.layout = html.Div([
     html.H1('Upload TindaPay Dashboard Data', style={'textAlign': 'center'}),
@@ -30,7 +28,7 @@ app.layout = html.Div([
     ),
     html.Div(id='output-data-upload', children=[]),
     html.Div(id='outlet-data-container', children=[
-        html.H2('Outlet Data', style={'textAlign': 'center'}),
+        html.H2('Outlet Data', style={'textAlign': 'center','width':'50%'}),
         dash_table.DataTable(
             id='outlet-table',
             columns=[
@@ -61,16 +59,16 @@ app.layout = html.Div([
 ])
 
 @app.callback(
-    [Output('output-data-upload', 'children'),
-     Output('outlet-table', 'data'),
-     Output('outlet-data-container', 'style')],
+    Output('output-data-upload', 'children'),
+    Output('outlet-table', 'data'),
+    Output('outlet-data-container', 'style'),
     [Input('upload-data', 'contents')],
     [State('upload-data', 'filename'),
-     State('upload-data', 'last_modified'),
-     State('output-data-upload', 'children')],
+     State('upload-data', 'last_modified')],
     prevent_initial_call=True
 )
-def update_output(contents, filename, date, children):
+def update_output(contents, filename, date):
+    children = []  # Initialize as an empty list at the start of the callback
     outlet_data = []
     if contents is not None:
         for i, (c, n, d) in enumerate(zip(contents, filename, date)):
@@ -80,114 +78,80 @@ def update_output(contents, filename, date, children):
                 if 'csv' in n:
                     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
                 elif 'xls' in n:
-                    # Reading multiple sheets
-                    df_usage = pd.read_excel(io.BytesIO(decoded), sheet_name="1. USAGE", skiprows=3, usecols='B:C')
-                    df_repeat = pd.read_excel(io.BytesIO(decoded), sheet_name="2. REPEAT", skiprows=3, usecols='B:D')
-                    df_repayment = pd.read_excel(io.BytesIO(decoded), sheet_name="3. REPAYMENT", skiprows=3, usecols='B:E', nrows=14)
-                    df_repayment2 = pd.read_excel(io.BytesIO(decoded), sheet_name="3. REPAYMENT", skiprows=20, usecols='B:E', nrows=14)
-                    df_outlet = pd.read_excel(io.BytesIO(decoded), sheet_name="3. REPAYMENT", skiprows=40, usecols='B:E', nrows=11)
-                    df_gsv1 = pd.read_excel(io.BytesIO(decoded), sheet_name="4. IMPACT TO GSV", skiprows=3, usecols='B:D', nrows=4)
+                    df_usage = pd.read_excel(io.BytesIO(decoded), sheet_name="TINDAPAY", skiprows=1, usecols='A:B')
+                    df_repeat = pd.read_excel(io.BytesIO(decoded), sheet_name="TINDAPAY", skiprows=1, usecols='D:F')
+                    df_repayment = pd.read_excel(io.BytesIO(decoded), sheet_name="TINDAPAY", skiprows=1, usecols='H:K')
+                    df_repayment2 = pd.read_excel(io.BytesIO(decoded), sheet_name="TINDAPAY", skiprows=1, usecols='M:P')
+                    df_outlet = pd.read_excel(io.BytesIO(decoded), sheet_name="TINDAPAY", skiprows=1, usecols='R:U')
+                    df_gsv1 = pd.read_excel(io.BytesIO(decoded), sheet_name="TINDAPAY", skiprows=1, usecols='W:Y')
+                    df_buy1 = pd.read_excel(io.BytesIO(decoded), sheet_name="TINDAPAY", skiprows=1, usecols='AA:AC')
+                    df_buy2 = pd.read_excel(io.BytesIO(decoded), sheet_name="TINDAPAY", skiprows=1, usecols='AE:AG')
 
-                    df_buy1 = pd.read_excel(io.BytesIO(decoded), sheet_name="4. IMPACT TO GSV", skiprows=11, usecols='B:D', nrows=4)
-
-                    df_buy2 = pd.read_excel(io.BytesIO(decoded), sheet_name="4. IMPACT TO GSV", skiprows=19, usecols='B:D', nrows=4)
-
-                    df_dict = {'1. USAGE': df_usage, '2. REPEAT': df_repeat, '3. REPAYMENT 1': df_repayment, '3. REPAYMENT 2': df_repayment2, '4. IMPACT TO GSV': df_gsv1, '4. IMPACT TO GSV 2': df_buy1, '4. IMPACT TO GSV 3': df_buy2}
-
+                    df_dict = {
+                        '1. USAGE': df_usage,
+                        '2. REPEAT': df_repeat,
+                        '3. REPAYMENT 1': df_repayment,
+                        '3. REPAYMENT 2': df_repayment2,
+                        '4. IMPACT TO GSV': df_gsv1,
+                        '4. IMPACT TO GSV 2': df_buy1,
+                        '4. IMPACT TO GSV 3': df_buy2
+                    }
+                    df_outlet = df_outlet.dropna()
                     outlet_data = df_outlet.to_dict('records')
 
                 for sheet_name, df in df_dict.items():
                     children.append(html.Div([
-                        html.H5(f'{n} - {sheet_name}'),
-                        dash_table.DataTable(
-                            data=df.to_dict('records'),
-                            columns=[{'name': col, 'id': col, 'selectable': True} for col in df.columns],
-                            page_size=5,
-                            filter_action='native',
-                            column_selectable='single',
-                            selected_columns=[df.columns[1]] if len(df.columns) >= 1 else [],
-                            style_table={'overflowX': 'auto'},
-                            id={'type': 'dynamic-table', 'index': f'{i}-{sheet_name}'},
-                        ),
                         dcc.Graph(
                             id={'type': 'dynamic-graph', 'index': f'{i}-{sheet_name}'},
-                            figure={}
+                            figure=create_graph(df, sheet_name)
                         ),
                         html.Hr()
                     ]))
             except Exception as e:
                 print(e)
-                return html.Div(['There was an error processing this file.'])
+                return html.Div(['There was an error processing this file.']), [], {'display': 'none'}
+
         return children, outlet_data, {'display': 'block'}
-    return "", outlet_data, {'display': 'none'}
+    return "", [], {'display': 'none'}
 
-@app.callback(
-    Output({'type': 'dynamic-graph', 'index': MATCH}, 'figure'),
-    Input({'type': 'dynamic-table', 'index': MATCH}, 'derived_virtual_indices'),
-    Input({'type': 'dynamic-table', 'index': MATCH}, 'selected_columns'),
-    State({'type': 'dynamic-table', 'index': MATCH}, 'data'))
-def create_graphs(filtered_data, selected_col, all_data):
-    if filtered_data is not None:
-        dff = pd.DataFrame(all_data)
-        dff = dff.loc[filtered_data]
-        print(dff.columns)
 
-        if 'WK' in dff.columns:
-            print("hii")
-            print(selected_col, "selected col")
-            if selected_col and selected_col[0] != 'Year':
-                print("hi0")
-                dff = dff.groupby('WK')[selected_col[0]].mean().reset_index()
-                return px.line(dff, x='WK', y=selected_col[0])
-        elif 'WK_r' in dff.columns:
-            fig = px.bar(dff, x='WK_r', y=['REPEAT', 'NEW'], title="Weekly Repeat and New Counts", 
-                        labels={'value': 'Count', 'variable': 'Type'}, barmode='stack')
-            return fig
-        elif 'WK_1' in dff.columns:
-             if 'Paid' in dff.columns and 'Outstanding' in dff.columns:
-                # Replace '-' with 0 in 'Outstanding'
-                dff['Outstanding'] = dff['Outstanding'].replace('-', 0).astype(float)
-                fig = px.bar(
-                    dff,
-                    x='WK_1',
-                    y=['Paid', 'Outstanding'],
-                    title='Total, Paid, and Outstanding Balances',
-                    labels={'value': 'Amount', 'variable': 'Balance Type'},
-                    barmode='stack'
-                )
-                fig.update_layout(xaxis_title='Week', yaxis_title='Amount')
-                return fig
-        elif 'WK_2' in dff.columns:
-             if 'Paid' in dff.columns and 'Outstanding' in dff.columns:
-                # Replace '-' with 0 in 'Outstanding'
-                dff['Outstanding'] = dff['Outstanding'].replace('-', 0).astype(float)
-                fig = px.bar(
-                    dff,
-                    x='WK_2',
-                    y=['Paid', 'Outstanding'],
-                    title='Total, Paid, and Outstanding Balances',
-                    labels={'value': 'Amount', 'variable': 'Balance Type'},
-                    barmode='stack'
-                )
-                fig.update_layout(xaxis_title='Week', yaxis_title='Amount')
-                return fig
-        elif 'REPEAT' in dff.columns and 'NEW' in dff.columns:
-            fig = px.bar(dff, x='WK', y=['REPEAT', 'NEW'], title="Weekly Repeat and New Counts",
-                         labels={'value': 'Count', 'variable': 'Type'}, barmode='stack')
-            return fig
-        elif 'Month_GSV' in dff.columns and 'GSV (PHP)' in dff.columns:
-            fig = px.bar(dff, x='Month_GSV', y=['GSV (PHP)', 'Growth vs Baseline'], title="GSV",
-                         labels={'value': 'Count', 'variable': 'Type'}, barmode='stack')
-            return fig
-        elif 'Month_BF' in dff.columns and 'No. of Invoices' in dff.columns:
-            fig = px.bar(dff, x='Month_BF', y=['No. of Invoices', 'Growth vs Baseline'], title="GSV",
-                         labels={'value': 'Count', 'variable': 'Type'}, barmode='stack')
-            return fig
-        elif 'Month' in dff.columns and 'Grew vs. Baseline' in dff.columns:
-            fig = px.bar(dff, x='Month', y=['Grew vs. Baseline', 'Did not grow vs. Baseline'], title="GSV",
-                         labels={'value': 'Count', 'variable': 'Type'}, barmode='stack')
-            return fig
-    return {}
+def create_graph(df, sheet_name):
+    fig = None
+    if 'WK' in df.columns and 'USAGE' in df.columns:
+        fig = px.line(df, x='WK', y='USAGE', title=f"{sheet_name} Usage Rate Over Weeks", labels={'WK': 'Week'})
+        fig.update_traces(mode='lines+markers+text', text=df['USAGE'].apply(lambda x: f"{x:.2f}"), textposition='top right')
+    elif 'WK.1' in df.columns and 'REPEAT' in df.columns:
+        fig = px.bar(df, x='WK.1', y=['REPEAT', 'NEW'], title=f"{sheet_name} Weekly Repeat and New Counts", 
+                      labels={'WK.1': 'Week', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+        fig.update_traces(text=df['NEW'].apply(lambda x: f"{x:.2f}"), textposition='outside', selector=dict(name='NEW'))
+    elif 'WK.2' in df.columns:
+        if 'Paid' in df.columns and 'Outstanding' in df.columns:
+            df['Outstanding'] = df['Outstanding'].replace('-', 0).astype(float)
+            fig = px.bar(df, x='WK.2', y=['Paid', 'Outstanding'], title=f"{sheet_name} Total, Paid, and Outstanding Balances",
+                          labels={'WK.2': 'Week', 'value': 'Amount', 'variable': 'Balance Type'}, barmode='stack')
+            fig.update_traces(text=df['Outstanding'].apply(lambda x: f"{x:.2f}"), textposition='outside', selector=dict(name='Outstanding'))
+    elif 'Week' in df.columns:
+        if 'Paid.1' in df.columns and 'Outstanding.1' in df.columns:
+            df['Outstanding.1'] = df['Outstanding.1'].replace('-', 0).astype(float)
+            fig = px.bar(df, x='Week', y=['Paid.1', 'Outstanding.1'], title=f"{sheet_name} Total, Paid, and Outstanding Balances",
+                          labels={'Week': 'Week', 'value': 'Amount', 'variable': 'Balance Type'}, barmode='stack')
+            fig.update_traces(text=df['Outstanding.1'].apply(lambda x: f"{x:.2f}"), textposition='outside', selector=dict(name='Outstanding.1'))
+    elif 'Month' in df.columns and 'GSV (PHP)' in df.columns:
+        fig = px.bar(df, x='Month', y=['GSV (PHP)', 'Growth vs Baseline'], title=f"{sheet_name}",
+                      labels={'Month': 'Month', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+    elif 'Month.1' in df.columns and 'No. of Invoices' in df.columns:
+        fig = px.bar(df, x='Month.1', y=['No. of Invoices', 'Growth vs Baseline.1'], title=f"{sheet_name}",
+                      labels={'Month.1': 'Month', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+    elif 'Month.2' in df.columns and 'Grew vs. Baseline' in df.columns:
+        fig = px.bar(df, x='Month.2', y=['Grew vs. Baseline', 'Did not grow vs. Baseline'], title=f"{sheet_name}",
+                      labels={'Month.2': 'Month', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+
+    if fig is not None:
+        fig.update_layout(xaxis=dict(tickmode='linear', dtick=1))  # Ensures every tick on x-axis is labeled
+
+    return fig
+
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)

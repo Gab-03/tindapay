@@ -29,7 +29,7 @@ app.layout = html.Div([
     ),
     html.Div(id='output-data-upload', children=[]),
     html.Div(id='outlet-data-container', children=[
-        html.H2('Outlet Data', style={'textAlign': 'center','width':'50%'}),
+        html.H2('Outlet Stores Performance', style={'textAlign': 'center','width':'100%'}),
         dash_table.DataTable(
             id='outlet-table',
             columns=[
@@ -116,36 +116,70 @@ def update_output(contents, filename, date):
     return "", [], {'display': 'none'}
 
 
+
 def create_graph(df, sheet_name):
     fig = None
     if 'WK' in df.columns and 'USAGE' in df.columns:
-        fig = px.line(df, x='WK', y='USAGE', title=f"{sheet_name} Usage Rate Over Weeks", labels={'WK': 'Week'})
+        fig = px.line(df, x='WK', y='USAGE', title="Usage Rate Over Weeks", labels={'WK': 'Week'})
         fig.update_traces(mode='lines+markers+text', text=df['USAGE'].apply(lambda x: f"{x:.2f}"), textposition='top right')
+
     elif 'WK.1' in df.columns and 'REPEAT' in df.columns:
-        fig = px.bar(df, x='WK.1', y=['REPEAT', 'NEW'], title=f"{sheet_name} Weekly Repeat and New Counts", 
+        fig = px.bar(df, x='WK.1', y=['REPEAT', 'NEW'], title=" Weekly Repeat and New Counts", 
                       labels={'WK.1': 'Week', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
-        fig.update_traces(text=df['NEW'].apply(lambda x: f"{x:.2f}"), textposition='outside', selector=dict(name='NEW'))
+        # Create text labels for each segment
+        df_melted = df.melt(id_vars='WK.1', value_vars=['REPEAT', 'NEW'])
+        text_labels = df_melted.groupby(['WK.1', 'variable'])['value'].apply(lambda x: [f"{v:.2f}" for v in x]).reset_index(name='text')
+        fig.update_traces(text=df['REPEAT'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='REPEAT'))
+        fig.update_traces(text=df['NEW'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='NEW'))
+
     elif 'WK.2' in df.columns:
         if 'Paid' in df.columns and 'Outstanding' in df.columns:
             df['Outstanding'] = df['Outstanding'].replace('-', 0).astype(float)
-            fig = px.bar(df, x='WK.2', y=['Paid', 'Outstanding'], title=f"{sheet_name} Total, Paid, and Outstanding Balances",
+            df['Paid'] = df['Paid'].replace('-', 0).astype(float)
+            fig = px.bar(df, x='WK.2', y=['Paid', 'Outstanding'], title=f"Total, Paid, and Outstanding Balances",
                           labels={'WK.2': 'Week', 'value': 'Amount', 'variable': 'Balance Type'}, barmode='stack')
-            fig.update_traces(text=df['Outstanding'].apply(lambda x: f"{x:.2f}"), textposition='outside', selector=dict(name='Outstanding'))
+            # Create text labels for both segments
+            fig.update_traces(text=df['Paid'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Paid'))
+            fig.update_traces(text=df['Outstanding'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Outstanding'))
+
     elif 'Week' in df.columns:
         if 'Paid.1' in df.columns and 'Outstanding.1' in df.columns:
             df['Outstanding.1'] = df['Outstanding.1'].replace('-', 0).astype(float)
-            fig = px.bar(df, x='Week', y=['Paid.1', 'Outstanding.1'], title=f"{sheet_name} Total, Paid, and Outstanding Balances",
+            df['Paid.1'] = df['Paid.1'].replace('-', 0).astype(float)
+            fig = px.bar(df, x='Week', y=['Paid.1', 'Outstanding.1'], title=f"Total, Paid, and Outstanding Balances",
                           labels={'Week': 'Week', 'value': 'Amount', 'variable': 'Balance Type'}, barmode='stack')
-            fig.update_traces(text=df['Outstanding.1'].apply(lambda x: f"{x:.2f}"), textposition='outside', selector=dict(name='Outstanding.1'))
+            # Create text labels for both segments
+            fig.update_traces(text=df['Paid.1'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Paid.1'))
+            fig.update_traces(text=df['Outstanding.1'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Outstanding.1'))
+
     elif 'Month' in df.columns and 'GSV (PHP)' in df.columns:
         fig = px.bar(df, x='Month', y=['GSV (PHP)', 'Growth vs Baseline'], title=f"{sheet_name}",
                       labels={'Month': 'Month', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+        # Create text labels for each segment
+        df_melted = df.melt(id_vars='Month', value_vars=['GSV (PHP)', 'Growth vs Baseline'])
+        text_labels = df_melted.groupby(['Month', 'variable'])['value'].apply(lambda x: [f"{v:.2f}" for v in x]).reset_index(name='text')
+        fig.update_traces(text=df['GSV (PHP)'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='GSV (PHP)'))
+        fig.update_traces(text=df['Growth vs Baseline'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Growth vs Baseline'))
+
     elif 'Month.1' in df.columns and 'No. of Invoices' in df.columns:
         fig = px.bar(df, x='Month.1', y=['No. of Invoices', 'Growth vs Baseline.1'], title=f"{sheet_name}",
                       labels={'Month.1': 'Month', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+        # Create text labels for each segment
+        df_melted = df.melt(id_vars='Month.1', value_vars=['No. of Invoices', 'Growth vs Baseline.1'])
+        text_labels = df_melted.groupby(['Month.1', 'variable'])['value'].apply(lambda x: [f"{v:.2f}" for v in x]).reset_index(name='text')
+        fig.update_traces(text=text_labels['text'], textposition='outside')
+        fig.update_traces(text=df['No. of Invoices'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='No. of Invoices'))
+        fig.update_traces(text=df['Growth vs Baseline.1'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Growth vs Baseline.1'))
+        
     elif 'Month.2' in df.columns and 'Grew vs. Baseline' in df.columns:
         fig = px.bar(df, x='Month.2', y=['Grew vs. Baseline', 'Did not grow vs. Baseline'], title=f"{sheet_name}",
                       labels={'Month.2': 'Month', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+        # Create text labels for each segment
+        df_melted = df.melt(id_vars='Month.2', value_vars=['Grew vs. Baseline', 'Did not grow vs. Baseline'])
+        text_labels = df_melted.groupby(['Month.2', 'variable'])['value'].apply(lambda x: [f"{v:.2f}" for v in x]).reset_index(name='text')
+        # fig.update_traces(text=text_labels['text'], textposition='outside')
+        fig.update_traces(text=df['Grew vs. Baseline'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Grew vs. Baseline'))
+        fig.update_traces(text=df['Did not grow vs. Baseline'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Did not grow vs. Baseline'))
 
     if fig is not None:
         fig.update_layout(xaxis=dict(tickmode='linear', dtick=1))  # Ensures every tick on x-axis is labeled

@@ -147,14 +147,14 @@ def create_graph(df, sheet_name):
             df['Outstanding.1'] = df['Outstanding.1'].replace('-', 0).astype(float)
             df['Paid.1'] = df['Paid.1'].replace('-', 0).astype(float)
             fig = px.bar(df, x='Week', y=['Paid.1', 'Outstanding.1'], title=f"Total, Paid, and Outstanding Balances",
-                          labels={'Week': 'Week', 'value': 'Amount', 'variable': 'Balance Type'}, barmode='stack')
+                          labels={'Week': 'Week', 'value': 'No. of Outlets', 'variable': 'Balance Type'}, barmode='stack')
             # Create text labels for both segments
             fig.update_traces(text=df['Paid.1'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Paid.1'))
             fig.update_traces(text=df['Outstanding.1'].apply(lambda x: f"{x:.2f}"), textposition='inside', selector=dict(name='Outstanding.1'))
 
     elif 'Month' in df.columns and 'GSV (PHP)' in df.columns:
         fig = px.bar(df, x='Month', y=['GSV (PHP)', 'Growth vs Baseline'], title=f"{sheet_name}",
-                      labels={'Month': 'Month', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+                      labels={'Month': 'Month', 'value': 'GSV (PHP)', 'variable': 'Type'}, barmode='stack')
         # Create text labels for each segment
         df_melted = df.melt(id_vars='Month', value_vars=['GSV (PHP)', 'Growth vs Baseline'])
         text_labels = df_melted.groupby(['Month', 'variable'])['value'].apply(lambda x: [f"{v:.2f}" for v in x]).reset_index(name='text')
@@ -163,7 +163,7 @@ def create_graph(df, sheet_name):
 
     elif 'Month.1' in df.columns and 'No. of Invoices' in df.columns:
         fig = px.bar(df, x='Month.1', y=['No. of Invoices', 'Growth vs Baseline.1'], title=f"{sheet_name}",
-                      labels={'Month.1': 'Month', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+                      labels={'Month.1': 'Month', 'value': 'No. of Invoices', 'variable': 'Type'}, barmode='stack')
         # Create text labels for each segment
         df_melted = df.melt(id_vars='Month.1', value_vars=['No. of Invoices', 'Growth vs Baseline.1'])
         text_labels = df_melted.groupby(['Month.1', 'variable'])['value'].apply(lambda x: [f"{v:.2f}" for v in x]).reset_index(name='text')
@@ -173,7 +173,7 @@ def create_graph(df, sheet_name):
         
     elif 'Month.2' in df.columns and 'Grew vs. Baseline' in df.columns:
         fig = px.bar(df, x='Month.2', y=['Grew vs. Baseline', 'Did not grow vs. Baseline'], title=f"{sheet_name}",
-                      labels={'Month.2': 'Month', 'value': 'Count', 'variable': 'Type'}, barmode='stack')
+                      labels={'Month.2': 'Month', 'value': 'No. of Outlets', 'variable': 'Type'}, barmode='stack')
         # Create text labels for each segment
         df_melted = df.melt(id_vars='Month.2', value_vars=['Grew vs. Baseline', 'Did not grow vs. Baseline'])
         text_labels = df_melted.groupby(['Month.2', 'variable'])['value'].apply(lambda x: [f"{v:.2f}" for v in x]).reset_index(name='text')
